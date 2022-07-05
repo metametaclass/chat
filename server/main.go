@@ -18,6 +18,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"strings"
 	"time"
 
@@ -274,6 +275,7 @@ func main() {
 	serverStatusPath := flag.String("server_status", "",
 		"Override the URL path where the server's internal status is displayed. Use '-' to disable.")
 	pprofFile := flag.String("pprof", "", "File name to save profiling info to. Disabled if not set.")
+	traceFile := flag.String("tracef", "", "File name to save trace info to. Disabled if not set.")
 	pprofUrl := flag.String("pprof_url", "", "Debugging only! URL path for exposing profiling info. Disabled if not set.")
 	flag.Parse()
 
@@ -363,6 +365,23 @@ func main() {
 		defer pprof.WriteHeapProfile(memf)
 
 		logs.Info.Printf("Profiling info saved to '%s.(cpu|mem)'", *pprofFile)
+	}
+
+	if *traceFile != "" {
+		f, err := os.Create(*traceFile)
+		if err != nil {
+			logs.Err.Fatal("Create trace file failed", err)
+		}
+		defer func() {
+			if err := f.Close(); err != nil {
+				logs.Warn.Printf("failed to close trace file: %v", err)
+			}
+		}()
+
+		if err := trace.Start(f); err != nil {
+			logs.Err.Fatal("Failed to start trace", err)
+		}
+		defer trace.Stop()
 	}
 
 	err = store.Store.Open(workerId, config.Store)
